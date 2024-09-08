@@ -39,15 +39,24 @@ else:
 new_pbp_file = "./staging_tables/play_by_play/play_by_play_new.csv"
 hist_pbp_file = "./staging_tables/play_by_play/play_by_play_hist.csv"
 
-transform_pbp = TransformPbP(new_pbp_file, hist_pbp_file, today, last_season)
-df_prepped_new_pbp = transform_pbp.prep_new_pbp()
+try:
+    transform_pbp = TransformPbP(new_pbp_file, hist_pbp_file, today, last_season)
+    df_prepped_new_pbp = transform_pbp.prep_new_pbp()
 
-df_game = transform_pbp.create_game_table(df_prepped_new_pbp)
-transform_pbp.create_game_team_table(df_game)
+    df_game = transform_pbp.create_game_table(df_prepped_new_pbp)
+    transform_pbp.create_game_team_table(df_game)
 
-transform_pbp.create_drive_table(df_prepped_new_pbp)
+    transform_pbp.create_drive_table(df_prepped_new_pbp)
 
-transform_pbp.create_series_table(df_prepped_new_pbp)
+    transform_pbp.create_series_table(df_prepped_new_pbp)
+
+    df_play = transform_pbp.create_play_staging_df(df_prepped_new_pbp)
+    df_play_player = transform_pbp.create_play_player_roles_staging_df(df_play)
+
+    print(df_play.head())
+    print(df_play_player.head())
+
+except FileNotFoundError:
+    print("No changes to play_by_play tables")
 
 
-# print(df_prepped_new_pbp.head())

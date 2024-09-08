@@ -12,11 +12,7 @@ class TransformRoster:
         self.today = today
 
     def prep_new_roster(self):
-        try:
-            df_roster_new = pd.read_csv(self.new_roster_file, dtype='str')
-        except:
-            df_roster_new = pd.DataFrame()
-            print('No new roster file')
+        df_roster_new = pd.read_csv(self.new_roster_file, dtype='str')
 
         # Filter down to the fields I need
         df_roster_new = df_roster_new.filter(
@@ -39,7 +35,8 @@ class TransformRoster:
         df_roster_new = df_roster_new.drop(columns=['week_2'])
 
         # Add season_team_id, so I can join in season_team file
-        df_roster_new['season_team_id'] = df_roster_new['season'].astype('str') + '_' + df_roster_new['team'].astype(
+        df_roster_new['season_team_id'] = df_roster_new['season'].astype('str') + '_' + df_roster_new[
+            'team'].astype(
             'str')
 
         # Rearrange the columns
@@ -48,7 +45,6 @@ class TransformRoster:
              'depth_chart_position', 'jersey_number', 'status', 'full_name', 'birth_date', 'height', 'weight',
              'college', 'entry_year', 'rookie_year', 'draft_club', 'draft_number']
         )
-
         return df_roster_new
 
     def merge_roster(self, df_roster_new):

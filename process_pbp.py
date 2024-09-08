@@ -1,5 +1,6 @@
 import pandas as pd
 import fnmatch
+import numpy as np
 import datetime as dt
 
 
@@ -19,6 +20,7 @@ def convert_result(df_game):
         return 1
     else:
         return 0
+
 
 def convert_win(df_away):
     if df_away['result'] == 0:
@@ -70,6 +72,7 @@ class TransformPbP:
         # Combine the two lists and filter the pbp dataframe down to just those
         columns_used = non_player_pbp_columns_used + player_id_pbp_columns_used
         df_play_by_play = df_pbp.filter(columns_used)
+
         return df_play_by_play
 
     @staticmethod
@@ -81,7 +84,7 @@ class TransformPbP:
              'total_line', 'div_game', 'roof', 'surface', 'home_coach', 'away_coach', 'stadium_id',
              'game_stadium', 'away_score', 'home_score'])
         df_game = df_game.drop_duplicates()
-        df_game = df_game.rename(columns={'game_id':'id'})
+        df_game = df_game.rename(columns={'game_id': 'id'})
 
         # Use the 'result' column to create a column saying if it was a home team win
         df_game['result'] = df_game['result'].astype('float')
@@ -93,7 +96,7 @@ class TransformPbP:
     @staticmethod
     def create_game_team_table(df_game):
         # Creating a table that has a record for every game for every team with infor for that team
-        df_game= df_game.rename(columns={'id':'game_id'})
+        df_game = df_game.rename(columns={'id': 'game_id'})
 
         # Home team
         df_home = df_game.filter(
@@ -129,14 +132,15 @@ class TransformPbP:
 
     @staticmethod
     def create_drive_table(df_play_by_play):
-        df_drive = df_play_by_play.filter(['game_id', 'drive_id', 'drive', 'posteam', 'posteam_type', 'defteam', 'fixed_drive',
-                              'fixed_drive_result', 'drive_real_start_time', 'drive_play_count',
-                              'drive_time_of_possession', 'drive_first_downs', 'drive_inside20',
-                              'drive_ended_with_score', 'drive_quarter_start', 'drive_quarter_end',
-                              'drive_yards_penalized', 'drive_start_transition', 'drive_end_transition',
-                              'drive_game_clock_start', 'drive_game_clock_end', 'drive_start_yard_line',
-                              'drive_play_id_started', 'drive_play_id_ended'])
-        df_drive = df_drive.rename(columns={'drive_id':'id'})
+        df_drive = df_play_by_play.filter(
+            ['game_id', 'drive_id', 'drive', 'posteam', 'posteam_type', 'defteam', 'fixed_drive',
+             'fixed_drive_result', 'drive_real_start_time', 'drive_play_count',
+             'drive_time_of_possession', 'drive_first_downs', 'drive_inside20',
+             'drive_ended_with_score', 'drive_quarter_start', 'drive_quarter_end',
+             'drive_yards_penalized', 'drive_start_transition', 'drive_end_transition',
+             'drive_game_clock_start', 'drive_game_clock_end', 'drive_start_yard_line',
+             'drive_play_id_started', 'drive_play_id_ended'])
+        df_drive = df_drive.rename(columns={'drive_id': 'id'})
         df_drive = df_drive.drop_duplicates()
         df_drive = df_drive.reset_index(drop=True)
 
@@ -152,5 +156,118 @@ class TransformPbP:
 
         df_series.to_csv('./production_tables/series.csv', index=False)
 
+    @staticmethod
+    def create_play_staging_df(df_play_by_play):
+        df_play = df_play_by_play.drop(columns=['series_success', 'series_result', 'fixed_drive',
+                                                'fixed_drive_result', 'drive_real_start_time', 'drive_play_count',
+                                                'drive_time_of_possession', 'drive_first_downs', 'drive_inside20',
+                                                'drive_ended_with_score', 'drive_quarter_start', 'drive_quarter_end',
+                                                'drive_yards_penalized', 'drive_start_transition',
+                                                'drive_end_transition',
+                                                'drive_game_clock_start', 'drive_game_clock_end',
+                                                'drive_start_yard_line',
+                                                'drive_play_id_started', 'drive_play_id_ended', 'home_team',
+                                                'away_team', 'season_type', 'game_date', 'stadium', 'location',
+                                                'result', 'total', 'spread_line', 'total_line', 'div_game', 'roof',
+                                                'surface',
+                                                'home_coach', 'away_coach', 'stadium_id', 'game_stadium', 'away_score',
+                                                'home_score'])
+        return df_play
 
+    def create_play_player_roles_staging_df(self, df_play):
+        # Add player accomplishments
+        # Scoring points
+        points_pp = ['td', 'kicker']
+        # TODO what do I do with two_point_conversion_result
 
+        df_play_player = pd.DataFrame(
+            columns=['uuid', 'game_id', 'player_id', 'role', 'role_type', 'points', 'yards', 'penalty_type'])
+
+        df_play['kicker_points'] = np.where(df_play['field_goal_result'] == 'made', 3, 0) + np.where(
+            df_play['extra_point_result'] == 'good', 1, 0)
+        df_play.replace({'kicker_points': {0: np.nan}}, inplace=True)
+
+        for n in points_pp:
+            p_id = n + '_player_id'
+            df_temp = df_play.dropna(subset=[p_id])
+            df_role = df_temp.filter(['uuid', 'game_id', p_id, 'kicker_points'])
+            df_role['role'] = n
+            df_role = df_role.rename(columns={p_id: 'player_id'})
+            if n == 'td':
+                df_role['points'] = 6
+            else:
+                df_role['points'] = df_role['kicker_points']
+            df_role['role_type'] = 'points'
+            df_role = df_role.filter(
+                ['uuid', 'game_id', 'player_id', 'role', 'role_type', 'points', 'yards', 'penalty_type'])
+            df_play_player = pd.concat([df_play_player, df_role])
+
+        # Tackling etc.
+        regular_pp = ['lateral_sack', 'interception', 'lateral_interception',
+                      'lateral_punt_returner', 'lateral_kickoff_returner', 'punter', 'own_kickoff_recovery', 'blocked',
+                      'tackle_for_loss_1', 'tackle_for_loss_2', 'qb_hit_1', 'qb_hit_2', 'forced_fumble_player_1',
+                      'forced_fumble_player_2', 'solo_tackle_1', 'solo_tackle_2', 'assist_tackle_1', 'assist_tackle_2',
+                      'assist_tackle_3', 'assist_tackle_4', 'tackle_with_assist_1', 'tackle_with_assist_2', 'fumbled_1',
+                      'fumbled_2', 'fumble_recovery_1', 'fumble_recovery_2', 'sack', 'half_sack_1', 'half_sack_2',
+                      'safety']
+
+        for n in regular_pp:
+            p_id = n + '_player_id'
+            df_temp = df_play.dropna(subset=[p_id])
+            df_role = df_temp.filter(['uuid', 'game_id', p_id])
+            df_role['role'] = n
+            df_role['role_type'] = 'other'
+            df_role = df_role.rename(columns={p_id: 'player_id'})
+            df_role = df_role.filter(
+                ['uuid', 'game_id', 'player_id', 'role', 'role_type'])
+            df_play_player = pd.concat([df_play_player, df_role])
+
+        # Yards
+        yards_pp = ['passer', 'receiver', 'rusher', 'lateral_receiver', 'lateral_rusher', 'penalty', 'punt_returner',
+                    'kickoff_returner', 'penalty']
+
+        for n in yards_pp:
+            p_id = n + '_player_id'
+            df_temp = df_play.dropna(subset=[p_id])
+            df_role = df_temp.filter(['uuid', 'game_id', p_id, 'passing_yards', 'receiving_yards', 'rushing_yards',
+                                      'lateral_receiving_yards', 'lateral_rushing_yards',
+                                      'penalty_type', 'penalty_yards', 'return_yards'])
+            df_role['role'] = n
+            df_role = df_role.rename(columns={p_id: 'player_id'})
+            if n == 'passer':
+                df_role['yards'] = df_role['passing_yards']
+                df_role['penalty_type'] = ''
+            elif n == 'receiver':
+                df_role['yards'] = df_role['receiving_yards']
+                df_role['penalty_type'] = ''
+            elif n == 'rusher':
+                df_role['yards'] = df_role['rushing_yards']
+                df_role['penalty_type'] = ''
+            elif n == 'lateral_receiver':
+                df_role['yards'] = df_role['lateral_receiving_yards']
+                df_role['penalty_type'] = ''
+            elif n == 'lateral_rusher':
+                df_role['yards'] = df_role['lateral_rushing_yards']
+                df_role['penalty_type'] = ''
+            elif n == 'punt_returner' or n == 'kickoff_returner':
+                df_role['yards'] = df_role['return_yards']
+                df_role['penalty_type'] = ''
+            elif n == 'penalty':
+                df_role['yards'] = df_role['penalty_yards']
+            df_role['role_type'] = 'yards'
+            df_role = df_role.filter(
+                ['uuid', 'game_id', 'player_id', 'role', 'role_type', 'points', 'yards', 'penalty_type'])
+            df_role = df_role.dropna()
+            df_play_player = pd.concat([df_play_player, df_role])
+
+        df_play_player.penalty_type.replace('', pd.NA)
+
+        # Add play_player_uuid to the accomplishments table
+        df_play_player = df_play_player.rename(columns={'uuid': 'play_uuid'})
+        df_play_player['uuid'] = df_play_player[['play_uuid', 'player_id']].agg('_'.join, axis=1)
+        df_play_player['last_update'] = self.today
+        df_play_player = df_play_player.filter(['last_update', 'uuid', 'game_id', 'player_id', 'role', 'role_type',
+                                                'points', 'yards', 'penalty_type'])
+        df_play_player = df_play_player.reset_index(drop=True)
+
+        return df_play_player
