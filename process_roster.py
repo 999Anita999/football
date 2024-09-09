@@ -40,10 +40,12 @@ class TransformRoster:
 
         # Rearrange the columns
         df_roster_new = df_roster_new.filter(
-            ['last_update', 'id', 'season_team_id', 'player_id', 'season', 'week', 'team', 'full_name', 'position',
+            ['last_update', 'newest', 'id', 'season_team_id', 'player_id', 'season', 'week', 'team', 'full_name', 'position',
              'depth_chart_position', 'jersey_number', 'status', 'full_name', 'birth_date', 'height', 'weight',
              'college', 'entry_year', 'rookie_year', 'draft_club', 'draft_number']
         )
+
+        df_roster_new = df_roster_new.reset_index(drop=True)
         return df_roster_new
 
     def merge_roster(self, df_roster_new):
