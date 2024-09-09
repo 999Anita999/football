@@ -1,6 +1,4 @@
 import pandas as pd
-import fnmatch
-import datetime as dt
 
 
 class TransformRoster:
@@ -31,6 +29,7 @@ class TransformRoster:
 
         # Add season_week_player_id which is the primary key and what I need to join it into play_player
         df_roster_new['week_2'] = df_roster_new['week'].astype('str').str.zfill(2)
+        df_roster_new['player_id'] = df_roster_new['player_id'].astype('str')
         df_roster_new['id'] = df_roster_new[['season', 'week_2', 'player_id']].agg('_'.join, axis=1)
         df_roster_new = df_roster_new.drop(columns=['week_2'])
 

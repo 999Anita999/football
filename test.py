@@ -1,17 +1,13 @@
 import pandas as pd
 import datetime as dt
 
-today = dt.date.today()
+df_2019 = pd.read_csv('./production_tables/play_player_2019.csv', dtype='str')
+df_2020 = pd.read_csv('./production_tables/play_player_2020.csv', dtype='str')
+df_2021 = pd.read_csv('./production_tables/play_player_2021.csv', dtype='str')
+df_2022 = pd.read_csv('./production_tables/play_player_2022.csv', dtype='str')
+df_2023 = pd.read_csv('./production_tables/play_player_2023.csv', dtype='str')
+df_full = pd.concat([df_2019, df_2020, df_2021, df_2022, df_2023])
+df_full = df_full.reset_index(drop=True)
 
-df = pd.read_csv('./rosters/roster_legacy.csv')
-df['last_update'] = today
+df_full.to_csv('./staging_tables/play_by_play/play_player_hist.csv', index=False)
 
-df = df.rename(columns={'gsis_id': 'player_id', 'season_week_player_id':'id'})
-
-df = df.filter(
-            ['last_update', 'id', 'season_team_id', 'player_id', 'season', 'week', 'team', 'full_name', 'position',
-             'depth_chart_position', 'jersey_number', 'status', 'full_name', 'birth_date', 'height', 'weight',
-             'college', 'entry_year', 'rookie_year', 'draft_club', 'draft_number']
-        )
-
-df.to_csv('./rosters/roster_weekly_hist.csv', index=False)
