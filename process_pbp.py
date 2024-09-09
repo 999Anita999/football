@@ -33,9 +33,16 @@ def convert_win(df_away):
 
 class TransformPbP:
 
-    def __init__(self, new_pbp_file, hist_pbp_file, today, last_season):
+    def __init__(self, new_pbp_file, today, last_season):
+        #TODO create hist table, add in these to the above parens  game_hist_file, game_team_hist_file, drive_hist_file, series_hist_file,
+        #                  play_hist_file, play_player_hist_file,
         self.new_pbp_file = new_pbp_file
-        self.hist_pbp_file = hist_pbp_file
+        # self.game_hist_file = game_hist_file
+        # self.game_team_hist_file = game_team_hist_file
+        # self.drive_hist_file = drive_hist_file
+        # self.series_hist_file = series_hist_file
+        # self.play_hist_file = play_hist_file
+        # self.play_player_hist_file = play_player_hist_file
         self.today = today
         self.last_season = last_season
 
@@ -172,6 +179,8 @@ class TransformPbP:
                                                 'surface',
                                                 'home_coach', 'away_coach', 'stadium_id', 'game_stadium', 'away_score',
                                                 'home_score'])
+
+        df_play.to_csv('./production_tables/play.csv', index=False)
         return df_play
 
     def create_play_player_roles_staging_df(self, df_play):
@@ -181,7 +190,7 @@ class TransformPbP:
         # TODO what do I do with two_point_conversion_result
 
         df_play_player = pd.DataFrame(
-            columns=['uuid', 'game_id', 'player_id', 'role', 'role_type', 'points', 'yards', 'penalty_type'])
+            columns=['uuid', 'game_id', 'season_week_id', 'player_id', 'role', 'role_type', 'points', 'yards', 'penalty_type'])
 
         df_play['kicker_points'] = np.where(df_play['field_goal_result'] == 'made', 3, 0) + np.where(
             df_play['extra_point_result'] == 'good', 1, 0)
@@ -190,7 +199,7 @@ class TransformPbP:
         for n in points_pp:
             p_id = n + '_player_id'
             df_temp = df_play.dropna(subset=[p_id])
-            df_role = df_temp.filter(['uuid', 'game_id', p_id, 'kicker_points'])
+            df_role = df_temp.filter(['uuid', 'game_id', 'season_week_id', p_id, 'kicker_points'])
             df_role['role'] = n
             df_role = df_role.rename(columns={p_id: 'player_id'})
             if n == 'td':
@@ -199,7 +208,7 @@ class TransformPbP:
                 df_role['points'] = df_role['kicker_points']
             df_role['role_type'] = 'points'
             df_role = df_role.filter(
-                ['uuid', 'game_id', 'player_id', 'role', 'role_type', 'points', 'yards', 'penalty_type'])
+                ['uuid', 'game_id', 'season_week_id', 'player_id', 'role', 'role_type', 'points', 'yards', 'penalty_type'])
             df_play_player = pd.concat([df_play_player, df_role])
 
         # Tackling etc.
@@ -214,12 +223,12 @@ class TransformPbP:
         for n in regular_pp:
             p_id = n + '_player_id'
             df_temp = df_play.dropna(subset=[p_id])
-            df_role = df_temp.filter(['uuid', 'game_id', p_id])
+            df_role = df_temp.filter(['uuid', 'game_id', 'season_week_id', p_id])
             df_role['role'] = n
             df_role['role_type'] = 'other'
             df_role = df_role.rename(columns={p_id: 'player_id'})
             df_role = df_role.filter(
-                ['uuid', 'game_id', 'player_id', 'role', 'role_type'])
+                ['uuid', 'game_id', 'season_week_id', 'player_id', 'role', 'role_type'])
             df_play_player = pd.concat([df_play_player, df_role])
 
         # Yards
@@ -229,7 +238,7 @@ class TransformPbP:
         for n in yards_pp:
             p_id = n + '_player_id'
             df_temp = df_play.dropna(subset=[p_id])
-            df_role = df_temp.filter(['uuid', 'game_id', p_id, 'passing_yards', 'receiving_yards', 'rushing_yards',
+            df_role = df_temp.filter(['uuid', 'game_id', 'season_week_id', p_id, 'passing_yards', 'receiving_yards', 'rushing_yards',
                                       'lateral_receiving_yards', 'lateral_rushing_yards',
                                       'penalty_type', 'penalty_yards', 'return_yards'])
             df_role['role'] = n
@@ -256,7 +265,7 @@ class TransformPbP:
                 df_role['yards'] = df_role['penalty_yards']
             df_role['role_type'] = 'yards'
             df_role = df_role.filter(
-                ['uuid', 'game_id', 'player_id', 'role', 'role_type', 'points', 'yards', 'penalty_type'])
+                ['uuid', 'game_id', 'season_week_id', 'player_id', 'role', 'role_type', 'points', 'yards', 'penalty_type'])
             df_role = df_role.dropna()
             df_play_player = pd.concat([df_play_player, df_role])
 
@@ -266,8 +275,11 @@ class TransformPbP:
         df_play_player = df_play_player.rename(columns={'uuid': 'play_uuid'})
         df_play_player['uuid'] = df_play_player[['play_uuid', 'player_id']].agg('_'.join, axis=1)
         df_play_player['last_update'] = self.today
-        df_play_player = df_play_player.filter(['last_update', 'uuid', 'game_id', 'player_id', 'role', 'role_type',
+        df_play_player['season_week_player_id'] = df_play_player[['season_week_id', 'player_id']].agg(
+            '_'.join, axis=1)
+        df_play_player = df_play_player.filter(['last_update', 'uuid', 'game_id', 'season_week_player_id', 'player_id', 'role', 'role_type',
                                                 'points', 'yards', 'penalty_type'])
         df_play_player = df_play_player.reset_index(drop=True)
 
+        df_play_player.to_csv('./production_tables/play_player.csv', index=False)
         return df_play_player
