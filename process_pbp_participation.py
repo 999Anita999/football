@@ -93,7 +93,8 @@ class TransformPbPParticipation:
         df_play_player_no_role_final.to_csv('./production_tables/play_player_no_role.csv', index=False)
 
         # Create the core play_player table with roles
-        df_player_participation = df_player_participation.drop(columns=['player_id', 'season_week_player_id'])
+        df_player_participation = df_player_participation.drop(columns=['player_id', 'season_week_player_id',
+                                                                        'play_uuid'])
         df_play_player_plus = df_play_player.merge(df_player_participation, how='left', on='uuid')
 
         df_play_player_hist = pd.read_csv(self.play_player_hist_file, dtype='str')

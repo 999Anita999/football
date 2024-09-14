@@ -290,7 +290,7 @@ class TransformPbP:
         df_play_player['season_week_player_id'] = df_play_player[['season_week_id', 'player_id']].agg(
             '_'.join, axis=1)
         df_play_player = df_play_player.filter(
-            ['last_update', 'uuid', 'game_id', 'season_week_player_id', 'player_id', 'role', 'role_type',
+            ['last_update', 'uuid', 'play_uuid', 'game_id', 'season_week_player_id', 'player_id', 'role', 'role_type',
              'points', 'yards', 'penalty_type'])
         df_play_player = df_play_player.reset_index(drop=True)
 

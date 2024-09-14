@@ -16,7 +16,9 @@ else:
     this_season = today.year - 1
 
 # Download new files
-retrieve_files = Retrieve(this_season)
+last_checked_ts_file = 'last_checked.txt'
+retrieve_files = Retrieve(this_season, last_checked_ts_file)
+retrieve_files.check_for_new_files()
 retrieve_files.download_new_files()
 
 # ------------process new roster file------------------
@@ -81,3 +83,10 @@ finally:
 
     if os.path.exists("./staging_tables/participation_by_play/pbp_participation_new.csv"):
         os.remove("./staging_tables/participation_by_play/pbp_participation_new.csv")
+
+# ------------update 'last run' timestamp------------------
+format_date = "%Y-%m-%d %H:%M:%S%z"
+last_run_ts = dt.datetime.now().strftime(format_date)
+
+with open('last_checked.txt', 'w') as f:
+    f.write(f"{last_run_ts}\n")
