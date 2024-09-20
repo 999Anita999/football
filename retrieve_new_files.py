@@ -30,12 +30,6 @@ class Retrieve:
         play_by_play_timestamp = "staging_tables/play_by_play/play_by_play_timestamp.csv"
         last_nflverse_pbp_update = convert_eastern_file_timestamp(play_by_play_timestamp)
 
-        pbp_participation_timestamp_url = 'https://github.com/nflverse/nflverse-data/releases/download/pbp_participation/timestamp.txt'
-        urllib.request.urlretrieve(pbp_participation_timestamp_url,
-                                   "./staging_tables/participation_by_play/pbp_participation_timestamp.csv")
-        pbp_participation_timestamp = "staging_tables/participation_by_play/pbp_participation_timestamp.csv"
-        last_nflverse_pbp_participation_update = convert_eastern_file_timestamp(pbp_participation_timestamp)
-
         roster_timestamp_url = 'https://github.com/nflverse/nflverse-data/releases/download/rosters/timestamp.txt'
         urllib.request.urlretrieve(roster_timestamp_url, "./staging_tables/rosters/roster_weekly_timestamp.csv")
         roster_timestamp = "staging_tables/rosters/roster_weekly_timestamp.csv"
@@ -49,7 +43,6 @@ class Retrieve:
         central_tz = pytz.timezone('America/Chicago')
         last_refresh_timestamp = central_tz.localize(last_refresh_timestamp_naive)
         self.refresh_pbp = last_refresh_timestamp < last_nflverse_pbp_update
-        self.refresh_pbp_participation = last_refresh_timestamp < last_nflverse_pbp_participation_update
         self.refresh_roster = last_refresh_timestamp < last_nflverse_roster_update
 
     def download_new_files(self):
@@ -59,14 +52,6 @@ class Retrieve:
                 urllib.request.urlretrieve(new_roster_url, "./staging_tables/rosters/roster_weekly_new.csv")
             except:
                 print('No new roster file')
-
-        if self.refresh_pbp_participation:
-            new_part_url = f'https://github.com/nflverse/nflverse-data/releases/download/pbp_participation/pbp_participation_{self.this_season}.csv'
-            try:
-                urllib.request.urlretrieve(new_part_url,
-                                           "./staging_tables/participation_by_play/pbp_participation_new.csv")
-            except:
-                print('No new pbp participation file')
 
         if self.refresh_pbp:
             new_pbp_url = f'https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_{self.this_season}.csv'

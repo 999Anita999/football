@@ -70,7 +70,7 @@ class TransformPbP:
                                        'desc', 'play_type', 'yards_gained', 'shotgun', 'no_huddle', 'qb_dropback',
                                        'qb_kneel', 'qb_spike', 'qb_scramble', 'pass_length', 'pass_location',
                                        'air_yards', 'yards_after_catch', 'run_location', 'run_gap', 'field_goal_result',
-                                       'kick_distance', 'first_down']
+                                       'kick_distance', 'first_down', 'interception', 'pass_touchdown']
         # I want all the columns that end in player_id, so here I grab that using a wildcard
         pbp_columns = df_pbp.columns.to_list()
         player_id_pbp_columns_used = fnmatch.filter(pbp_columns, '*player_id')
@@ -201,9 +201,27 @@ class TransformPbP:
             columns=['uuid', 'game_id', 'season_week_id', 'player_id', 'role', 'role_type', 'points', 'yards',
                      'penalty_type'])
 
+        # Prescribe points given for kicks
         df_play['kicker_points'] = np.where(df_play['field_goal_result'] == 'made', 3, 0) + np.where(
             df_play['extra_point_result'] == 'good', 1, 0)
         df_play.replace({'kicker_points': {0: np.nan}}, inplace=True)
+
+        # Add interceptions for passers
+        df_interceptions = df_play.query('interception=="1"')
+        df_interceptions = df_interceptions.filter(['uuid', 'game_id', 'season_week_id', 'passer_player_id'])
+        df_interceptions = df_interceptions.rename(columns={'passer_player_id': 'player_id'})
+        df_interceptions['role'] = 'pass_intercepted'
+        df_interceptions['role_type'] = 'passer_other'
+        df_play_player = pd.concat([df_play_player, df_interceptions])
+
+        # Add passing touchdowns for passers
+        df_pass_tds = df_play.query('pass_touchdown=="1"')
+        df_pass_tds = df_pass_tds.filter(['uuid', 'game_id', 'season_week_id', 'passer_player_id'])
+        df_pass_tds = df_pass_tds.rename(columns={'passer_player_id': 'player_id'})
+        df_pass_tds['role'] = 'pass_touchdown'
+        df_pass_tds['role_type'] = 'passer_other'
+        df_pass_tds['points'] = 6
+        df_play_player = pd.concat([df_play_player, df_pass_tds])
 
         for n in points_pp:
             p_id = n + '_player_id'
@@ -222,7 +240,7 @@ class TransformPbP:
             df_play_player = pd.concat([df_play_player, df_role])
 
         # Tackling etc.
-        regular_pp = ['lateral_sack', 'interception', 'lateral_interception',
+        regular_pp = ['lateral_sack','lateral_interception',
                       'lateral_punt_returner', 'lateral_kickoff_returner', 'punter', 'own_kickoff_recovery', 'blocked',
                       'tackle_for_loss_1', 'tackle_for_loss_2', 'qb_hit_1', 'qb_hit_2', 'forced_fumble_player_1',
                       'forced_fumble_player_2', 'solo_tackle_1', 'solo_tackle_2', 'assist_tackle_1', 'assist_tackle_2',
@@ -243,7 +261,7 @@ class TransformPbP:
 
         # Yards
         yards_pp = ['passer', 'receiver', 'rusher', 'lateral_receiver', 'lateral_rusher', 'penalty', 'punt_returner',
-                    'kickoff_returner', 'penalty']
+                    'kickoff_returner', 'penalty', 'interception']
 
         for n in yards_pp:
             p_id = n + '_player_id'
@@ -270,6 +288,9 @@ class TransformPbP:
                 df_role['yards'] = df_role['lateral_rushing_yards']
                 df_role['penalty_type'] = ''
             elif n == 'punt_returner' or n == 'kickoff_returner':
+                df_role['yards'] = df_role['return_yards']
+                df_role['penalty_type'] = ''
+            elif n == 'interception':
                 df_role['yards'] = df_role['return_yards']
                 df_role['penalty_type'] = ''
             elif n == 'penalty':

@@ -3,7 +3,6 @@ import os
 from retrieve_new_files import Retrieve
 from process_roster import TransformRoster
 from process_pbp import TransformPbP
-from process_pbp_participation import TransformPbPParticipation
 
 # Create a variable for last season and this season
 today = dt.date.today()
@@ -60,27 +59,16 @@ try:
     df_play_player = transform_pbp.create_play_player_roles_staging_df(df_play)
 
 except FileNotFoundError:
-    print("No changes to play_by_play tables, so none processed.  No changes participation file processed either")
+    print("No changes to play_by_play tables, so none processed.")
 
-else:
-    # ------------process new participation file------------------
-    new_participation_file = "./staging_tables/participation_by_play/pbp_participation_new.csv"
-    play_player_no_role_hist_file = "./staging_tables/play_by_play/play_player_no_role_hist.csv"
+# Note: it does not look like the participation table is going to be updated after the 2023 season, so I'm removing it
+# from the process.  I may look to the snap count file to serve this function, but at an aggregated level.
 
-    try:
-        transform_pbp_participation = TransformPbPParticipation(new_participation_file, play_hist_file,
-                                                                play_player_no_role_hist_file, play_player_hist_file,
-                                                                today)
-        df_play_plus = transform_pbp_participation.add_participation_to_play(df_play)
-        transform_pbp_participation.add_participation_to_play_player(df_play_plus, df_play_player)
-
-    except FileNotFoundError:
-        print('No changes to pbp participation file, so none processed')
 
 finally:
-    if os.path.exists("./staging_tables/play_by_play/play_by_play_new.csv"):
-        os.remove("./staging_tables/play_by_play/play_by_play_new.csv")
-
+    # if os.path.exists("./staging_tables/play_by_play/play_by_play_new.csv"):
+    #     os.remove("./staging_tables/play_by_play/play_by_play_new.csv")
+    #
     if os.path.exists("./staging_tables/participation_by_play/pbp_participation_new.csv"):
         os.remove("./staging_tables/participation_by_play/pbp_participation_new.csv")
 
