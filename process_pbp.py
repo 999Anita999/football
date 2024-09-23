@@ -70,7 +70,8 @@ class TransformPbP:
                                        'desc', 'play_type', 'yards_gained', 'shotgun', 'no_huddle', 'qb_dropback',
                                        'qb_kneel', 'qb_spike', 'qb_scramble', 'pass_length', 'pass_location',
                                        'air_yards', 'yards_after_catch', 'run_location', 'run_gap', 'field_goal_result',
-                                       'kick_distance', 'first_down', 'interception', 'pass_touchdown']
+                                       'kick_distance', 'first_down', 'interception', 'pass_touchdown',
+                                       'two_point_attempt', 'two_point_conv_result']
         # I want all the columns that end in player_id, so here I grab that using a wildcard
         pbp_columns = df_pbp.columns.to_list()
         player_id_pbp_columns_used = fnmatch.filter(pbp_columns, '*player_id')
@@ -97,6 +98,7 @@ class TransformPbP:
         df_game_hist = pd.read_csv(self.game_hist_file, dtype='str')
         df_game_final = pd.concat([df_game, df_game_hist])
         df_game_final = df_game_final.reset_index(drop=True)
+        df_game_final = df_game_final.drop_duplicates()
         df_game_final.to_csv('./production_tables/game.csv', index=False)
         return df_game
 
@@ -137,6 +139,7 @@ class TransformPbP:
         df_game_team_hist = pd.read_csv(self.game_team_hist_file, dtype='str')
         df_game_team_final = pd.concat([df_team, df_game_team_hist])
         df_game_team_final = df_game_team_final.reset_index(drop=True)
+        df_game_team_final = df_game_team_final.drop_duplicates()
         df_game_team_final.to_csv('./production_tables/game_team.csv', index=False)
 
     def create_drive_table(self, df_play_by_play):
@@ -155,6 +158,7 @@ class TransformPbP:
         df_drive_hist = pd.read_csv(self.drive_hist_file, dtype='str')
         df_drive_final = pd.concat([df_drive, df_drive_hist])
         df_drive_final = df_drive_final.reset_index(drop=True)
+        df_drive_final = df_drive_final.drop_duplicates()
         df_drive_final.to_csv('./production_tables/drive.csv', index=False)
 
     def create_series_table(self, df_play_by_play):
@@ -167,6 +171,7 @@ class TransformPbP:
         df_series_hist = pd.read_csv(self.series_hist_file, dtype='str')
         df_series_final = pd.concat([df_series, df_series_hist])
         df_series_final = df_series_final.reset_index(drop=True)
+        df_series_final = df_series_final.drop_duplicates()
         df_series_final.to_csv('./production_tables/series.csv', index=False)
 
     def create_play_staging_df(self, df_play_by_play):
@@ -188,15 +193,12 @@ class TransformPbP:
         df_play_hist = pd.read_csv(self.play_hist_file, dtype='str')
         df_play_final = pd.concat([df_play, df_play_hist])
         df_play_final = df_play_final.reset_index(drop=True)
+        df_play_final = df_play_final.drop_duplicates()
         df_play_final.to_csv('./production_tables/play.csv', index=False)
         return df_play
 
     def create_play_player_roles_staging_df(self, df_play):
         # Add player accomplishments
-        # Scoring points
-        points_pp = ['td', 'kicker']
-        # TODO what do I do with two_point_conversion_result
-
         df_play_player = pd.DataFrame(
             columns=['uuid', 'game_id', 'season_week_id', 'player_id', 'role', 'role_type', 'points', 'yards',
                      'penalty_type'])
@@ -211,7 +213,7 @@ class TransformPbP:
         df_interceptions = df_interceptions.filter(['uuid', 'game_id', 'season_week_id', 'passer_player_id'])
         df_interceptions = df_interceptions.rename(columns={'passer_player_id': 'player_id'})
         df_interceptions['role'] = 'pass_intercepted'
-        df_interceptions['role_type'] = 'passer_other'
+        df_interceptions['role_type'] = 'other'
         df_play_player = pd.concat([df_play_player, df_interceptions])
 
         # Add passing touchdowns for passers
@@ -219,9 +221,27 @@ class TransformPbP:
         df_pass_tds = df_pass_tds.filter(['uuid', 'game_id', 'season_week_id', 'passer_player_id'])
         df_pass_tds = df_pass_tds.rename(columns={'passer_player_id': 'player_id'})
         df_pass_tds['role'] = 'pass_touchdown'
-        df_pass_tds['role_type'] = 'passer_other'
+        df_pass_tds['role_type'] = 'points'
         df_pass_tds['points'] = 6
         df_play_player = pd.concat([df_play_player, df_pass_tds])
+
+        # Add two point conversions
+        two_points_pp = ['passer', 'receiver', 'rusher']
+        df_two_point_conv = df_play.query('two_point_conv_result=="success"')
+        for n in two_points_pp:
+            p_id = n + '_player_id'
+            df_temp = df_two_point_conv.dropna(subset=[p_id])
+            df_role = df_temp.filter(['uuid', 'game_id', 'season_week_id', p_id])
+            df_role['role'] = n + '_2_pt_conv'
+            df_role = df_role.rename(columns={p_id: 'player_id'})
+            df_role['points'] = 2
+            df_role['role_type'] = 'points'
+            df_role = df_role.filter(
+                ['uuid', 'game_id', 'season_week_id', 'player_id', 'role', 'role_type', 'points'])
+            df_play_player = pd.concat([df_play_player, df_role])
+
+        # Scoring points
+        points_pp = ['td', 'kicker']
 
         for n in points_pp:
             p_id = n + '_player_id'
@@ -318,5 +338,6 @@ class TransformPbP:
         df_play_player_hist = pd.read_csv(self.play_player_hist_file, dtype='str')
         df_play_player_final = pd.concat([df_play_player, df_play_player_hist])
         df_play_player_final = df_play_player_final.reset_index(drop=True)
+        df_play_player_final = df_play_player_final.drop_duplicates()
         df_play_player_final.to_csv('./production_tables/play_player.csv', index=False)
         return df_play_player

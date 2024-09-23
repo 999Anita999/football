@@ -66,11 +66,9 @@ except FileNotFoundError:
 
 
 finally:
-    # if os.path.exists("./staging_tables/play_by_play/play_by_play_new.csv"):
-    #     os.remove("./staging_tables/play_by_play/play_by_play_new.csv")
-    #
-    if os.path.exists("./staging_tables/participation_by_play/pbp_participation_new.csv"):
-        os.remove("./staging_tables/participation_by_play/pbp_participation_new.csv")
+    if os.path.exists("./staging_tables/play_by_play/play_by_play_new.csv"):
+        os.remove("./staging_tables/play_by_play/play_by_play_new.csv")
+
 
 # ------------update 'last run' timestamp------------------
 format_date = "%Y-%m-%d %H:%M:%S%z"

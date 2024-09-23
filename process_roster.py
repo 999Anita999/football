@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 
 
 class TransformRoster:
@@ -24,8 +25,12 @@ class TransformRoster:
         # Add update timestamp
         df_roster_new['last_update'] = self.today
 
+        # Find just the latest week
+        ser = pd.Series(df_roster_new['week'], dtype='int32')
+        latest = str(ser.max())
+
         # Add flag to indicate that these are the records from the latest update
-        df_roster_new['newest'] = 1
+        df_roster_new['newest'] = np.where(df_roster_new['week'] == latest, '1', '')
 
         # Add season_week_player_id which is the primary key and what I need to join it into play_player
         df_roster_new['week_2'] = df_roster_new['week'].astype('str').str.zfill(2)
