@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 from bs4 import BeautifulSoup
 import requests
 import datetime as dt
@@ -8,37 +9,44 @@ from retrieve_new_files import Retrieve
 import pytz
 
 
-# def convert_eastern_file_timestamp(timestamp_file):
-#     with open(timestamp_file) as f:
-#         newest_file_ts_raw = f.read()
-#     clean_ts = newest_file_ts_raw.strip()
-#     newest_file_string = clean_ts[:-4]
-#     format_date = "%Y-%m-%d %H:%M:%S"
-#     newest_file_date = dt.datetime.strptime(newest_file_string, format_date)
-#     eastern_tz = pytz.timezone('America/New_York')
-#     newest_file_date_eastern = eastern_tz.localize(newest_file_date)
-#     return newest_file_date_eastern
-#
-#
-# play_by_play_timestamp = "staging_tables/play_by_play/play_by_play_timestamp.csv"
-# last_nflverse_pbp_update = convert_eastern_file_timestamp(play_by_play_timestamp)
-#
-# pbp_participation_timestamp = "staging_tables/participation_by_play/pbp_participation_timestamp.csv"
-# last_nflverse_pbp_participation_update = convert_eastern_file_timestamp(pbp_participation_timestamp)
-#
-# roster_timestamp = "staging_tables/rosters/roster_weekly_timestamp.csv"
-# last_nflverse_roster_update = convert_eastern_file_timestamp(roster_timestamp)
-#
-# with open('last_checked.txt') as f:
-#     last_refresh = f.read()
-# clean_last_refresh = last_refresh.strip()
-# format_date = "%Y-%m-%d %H:%M:%S"
-# last_refresh_timestamp_naive = dt.datetime.strptime(clean_last_refresh, format_date)
-# central_tz = pytz.timezone('America/Chicago')
-# last_refresh_timestamp = central_tz.localize(last_refresh_timestamp_naive)
-# refresh_pbp = last_refresh_timestamp < last_nflverse_pbp_update
-# refresh_pbp_participation = last_refresh_timestamp < last_nflverse_pbp_participation_update
-# refresh_roster = last_refresh_timestamp < last_nflverse_roster_update
-# print(refresh_pbp)
-# print(refresh_pbp_participation)
-# print(refresh_roster)
+df_roster_new = pd.read_csv('staging_tables/rosters/roster_weekly_new.csv', dtype='str')
+
+# Filter down to the fields I need
+df_roster_new = df_roster_new.filter(
+    ['season', 'week', 'gsis_id', 'full_name', 'team', 'position', 'depth_chart_position', 'jersey_number',
+     'status', 'full_name', 'birth_date', 'height', 'weight', 'college', 'entry_year',
+     'rookie_year', 'draft_club', 'draft_number'])
+
+# Rename gsis_id to player_id for consistency
+df_roster_new = df_roster_new.rename(columns={'gsis_id': 'player_id', })
+
+
+# Find just the latest week
+ser = pd.Series(df_roster_new['week'], dtype='int32')
+latest = str(ser.max())
+print(latest)
+
+# Add flag to indicate that these are the records from the latest update
+df_roster_new['newest'] = np.where(df_roster_new['week'] == latest, '1','')
+
+# Add season_week_player_id which is the primary key and what I need to join it into play_player
+df_roster_new['week_2'] = df_roster_new['week'].astype('str').str.zfill(2)
+df_roster_new['player_id'] = df_roster_new['player_id'].astype('str')
+df_roster_new['id'] = df_roster_new[['season', 'week_2', 'player_id']].agg('_'.join, axis=1)
+df_roster_new = df_roster_new.drop(columns=['week_2'])
+
+# Add season_team_id, so I can join in season_team file
+df_roster_new['season_team_id'] = df_roster_new['season'].astype('str') + '_' + df_roster_new[
+    'team'].astype(
+    'str')
+
+# Rearrange the columns
+df_roster_new = df_roster_new.filter(
+    ['last_update', 'newest', 'id', 'season_team_id', 'player_id', 'season', 'week', 'team', 'full_name', 'position',
+     'depth_chart_position', 'jersey_number', 'status', 'full_name', 'birth_date', 'height', 'weight',
+     'college', 'entry_year', 'rookie_year', 'draft_club', 'draft_number']
+)
+
+df_roster_new = df_roster_new.reset_index(drop=True)
+
+df_roster_new.to_csv('staging_tables/rosters/roster_weekly_newest.csv', index=False)
