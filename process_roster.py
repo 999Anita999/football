@@ -25,12 +25,16 @@ class TransformRoster:
         # Add update timestamp
         df_roster_new['last_update'] = self.today
 
-        # Find just the latest week
-        ser = pd.Series(df_roster_new['week'], dtype='int32')
-        latest = str(ser.max())
+        # Find just the latest week for each team (accounts for bye weeks)
+        df_roster_latest_week = df_roster_new.filter(['week', 'team'])
+
+        df_roster_latest_week = df_roster_latest_week.groupby('team').max()
 
         # Add flag to indicate that these are the records from the latest update
-        df_roster_new['newest'] = np.where(df_roster_new['week'] == latest, '1', '')
+        df_roster_new = df_roster_new.merge(df_roster_latest_week, how='left', on='team')
+        df_roster_new['newest'] = np.where(df_roster_new['week_x'] == df_roster_new['week_y'], '1', '')
+        df_roster_new.drop(columns=['week_y'], inplace=True)
+        df_roster_new = df_roster_new.rename(columns={'week_x': 'week'})
 
         # Add season_week_player_id which is the primary key and what I need to join it into play_player
         df_roster_new['week_2'] = df_roster_new['week'].astype('str').str.zfill(2)
